@@ -26,6 +26,12 @@
 #   equivalent, since this is probably being called from CRON.
 PATH="${PATH}:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"
 
+# Make sure this script is running as root.
+if [[ "$(whoami)${UID}" != "root0" ]]; then
+    echo "ERROR: This script must be run as the 'root' user. Exiting."
+    exit 2
+fi
+
 # Run checks for dependencies. If one or more could not be found, issue an error and die.
 MISSING_CMDS=
 for x in tcpdump sendmail dig; do
@@ -76,14 +82,21 @@ PCAP_DST_PARSE="${PCAP_YESTERDAY}.dump"
 PCAP_DST_STATS=$(mktemp)
 PCAP_NOTIF=$(mktemp)
 
+# If the pcaps dir doesn't exist, quickly create it and set its permissions.
+if [[ ! -d $PCAP_DIR && -n $PCAP_DIR ]]; then
+    mkdir -p $PCAP_DIR
+    [[ $? -ne 0 ]] && echo "ERROR: Failed to find or create the PCAPs dir at: '${PCAP_DIR}'. Exiting." && exit 2
+    chmod 700 $PCAP_DIR
+fi
+
 
 ##############################
 # Function declarations.
 # Usage - Display HELP information.
 function usage() {
     echo "USAGE: $0 {-n|dumpDuration} [email]"
-    echo "    dumpDuration: The amount of time in seconds to run tcpdump."
-    echo "    -n:           Don't run a capture, just interpret the previous report."
+    echo "    dumpDuration: The amount of time in seconds to run tcpdump before ending the capture."
+    echo "    -n:           Don't run a capture, just interpret the previous report and send the digest."
     echo "    [email]:      OPTIONAL. Overrides the static recipient for the notification."
     echo
     exit 1
